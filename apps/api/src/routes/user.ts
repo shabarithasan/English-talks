@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { databaseEnabled } from "../config.js";
 import { requireAuth } from "../middleware/require-auth.js";
 import { prisma } from "../lib/prisma.js";
 import { serializeSession, serializeUser } from "../lib/serializers.js";
@@ -23,6 +24,10 @@ const passwordUpdateSchema = z.object({
 });
 
 userRouter.get("/profile", requireAuth, async (req: AuthenticatedRequest, res) => {
+  if (!databaseEnabled) {
+    return res.status(503).json({ error: "User profiles require Turso or local development mode." });
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: req.user!.userId },
     include: {
@@ -48,6 +53,10 @@ userRouter.get("/profile", requireAuth, async (req: AuthenticatedRequest, res) =
 });
 
 userRouter.patch("/profile", requireAuth, async (req: AuthenticatedRequest, res) => {
+  if (!databaseEnabled) {
+    return res.status(503).json({ error: "Profile updates require Turso or local development mode." });
+  }
+
   const parsed = profileUpdateSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -86,6 +95,10 @@ userRouter.patch("/profile", requireAuth, async (req: AuthenticatedRequest, res)
 });
 
 userRouter.patch("/password", requireAuth, async (req: AuthenticatedRequest, res) => {
+  if (!databaseEnabled) {
+    return res.status(503).json({ error: "Password updates require Turso or local development mode." });
+  }
+
   const parsed = passwordUpdateSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -117,6 +130,10 @@ userRouter.patch("/password", requireAuth, async (req: AuthenticatedRequest, res
 });
 
 userRouter.get("/sessions", requireAuth, async (req: AuthenticatedRequest, res) => {
+  if (!databaseEnabled) {
+    return res.status(503).json({ error: "Session history requires Turso or local development mode." });
+  }
+
   const userSessions = await prisma.session.findMany({
     where: { userId: req.user!.userId },
     orderBy: { startedAt: "desc" },

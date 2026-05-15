@@ -1,5 +1,5 @@
 import { PrismaLibSQL } from "@prisma/adapter-libsql";
-import { courseTracks, vocabularyKeywordBank, vocabularyTopics } from "@english-talks/shared";
+import { courseTracks, vocabularyKeywordBank, vocabularyTopics } from "../src/lib/api-content.js";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = process.env.TURSO_DATABASE_URL

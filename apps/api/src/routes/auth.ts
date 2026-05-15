@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { z } from "zod";
+import { databaseEnabled } from "../config.js";
 import { signToken } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { serializeUser } from "../lib/serializers.js";
@@ -23,6 +24,10 @@ const loginSchema = z.object({
 export const authRouter = Router();
 
 authRouter.post("/register", async (req, res) => {
+  if (!databaseEnabled) {
+    return res.status(503).json({ error: "Registration requires a persistent database. Configure Turso to enable auth." });
+  }
+
   const parsed = registerSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -71,6 +76,10 @@ authRouter.post("/register", async (req, res) => {
 });
 
 authRouter.post("/login", async (req, res) => {
+  if (!databaseEnabled) {
+    return res.status(503).json({ error: "Login requires a persistent database. Configure Turso to enable auth." });
+  }
+
   const parsed = loginSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -117,6 +126,10 @@ authRouter.post("/logout", (_req, res) => {
 });
 
 authRouter.get("/me", requireAuth, async (req: AuthenticatedRequest, res) => {
+  if (!databaseEnabled) {
+    return res.status(503).json({ error: "Persistent auth is unavailable in stateless demo mode." });
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: req.user!.userId },
   });

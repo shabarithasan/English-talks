@@ -22,3 +22,5 @@ const configSchema = z.object({
 });
 
 export const config = configSchema.parse(process.env);
+
+export const databaseEnabled = Boolean(config.TURSO_DATABASE_URL) || !process.env.VERCEL;

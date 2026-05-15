@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
+import { databaseEnabled } from "../config.js";
 import { requireAuth } from "../middleware/require-auth.js";
 import { prisma } from "../lib/prisma.js";
 import { serializeSession } from "../lib/serializers.js";
@@ -31,6 +32,10 @@ practiceRouter.post(
   requireAuth,
   upload.single("audio"),
   async (req: AuthenticatedRequest, res) => {
+    if (!databaseEnabled) {
+      return res.status(503).json({ error: "Practice session persistence requires Turso or local development mode." });
+    }
+
     const parsed = speechUploadSchema.safeParse(req.body);
 
     if (!parsed.success) {
@@ -86,6 +91,10 @@ practiceRouter.post(
 );
 
 practiceRouter.post("/score", requireAuth, async (req, res) => {
+  if (!databaseEnabled) {
+    return res.status(503).json({ error: "Scoring requires Turso or local development mode." });
+  }
+
   const parsed = scoreSchema.safeParse(req.body);
 
   if (!parsed.success) {

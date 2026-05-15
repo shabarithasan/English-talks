@@ -1,4 +1,4 @@
-import { courseTracks, vocabularyKeywordBank, vocabularyTopics } from "@english-talks/shared";
+import { courseTracks, vocabularyKeywordBank, vocabularyTopics } from "./api-content.js";
 import { prisma } from "./prisma.js";
 
 export async function ensureSeedData() {

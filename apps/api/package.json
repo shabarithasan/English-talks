@@ -4,19 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "npm run db:push && npm run build --workspace @english-talks/shared",
+    "predev": "npm run db:push",
     "dev": "tsx watch src/index.ts",
-    "prebuild": "npm run db:generate && npm run build --workspace @english-talks/shared",
+    "prebuild": "npm run db:generate",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "pretypecheck": "npm run db:generate && npm run build --workspace @english-talks/shared",
+    "pretypecheck": "npm run db:generate",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:generate": "prisma generate",
     "db:push": "prisma db push --skip-generate && prisma generate",
-    "db:seed": "npm run build --workspace @english-talks/shared && tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@english-talks/shared": "*",
     "@prisma/adapter-libsql": "^6.19.0",
     "@prisma/client": "^6.18.0",
     "bcryptjs": "^3.0.3",

@@ -1,7 +1,8 @@
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { defaultVocabularyOptions } from "@english-talks/shared";
+import { defaultVocabularyOptions, vocabularyKeywordBank, vocabularyTopics } from "../lib/api-content.js";
+import { databaseEnabled } from "../config.js";
 import { verifyToken } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import type { AuthenticatedRequest } from "../types.js";
@@ -114,9 +115,89 @@ function serializeVocabularySession(session: VocabularySessionPayload) {
   };
 }
 
+function createDemoVocabularySession(topicSlugs: string[], options: Partial<typeof defaultVocabularyOptions> = {}) {
+  const mergedOptions = { ...defaultVocabularyOptions, ...options };
+  const topics = vocabularyTopics.filter((topic) => topicSlugs.includes(topic.slug));
+  const words = topics
+    .flatMap((topic) => vocabularyKeywordBank[topic.slug] ?? [])
+    .slice(0, mergedOptions.wordCount)
+    .map((word, index) => ({
+      id: `demo-word-${index + 1}`,
+      term: word.term,
+      definition: word.definition,
+      samplePrompt: word.samplePrompt,
+      emphasisRank: index + 1,
+      positionX: [48, 35, 63, 24, 72][index] ?? 50,
+      positionY: [48, 34, 38, 60, 62][index] ?? 50,
+      rotationDeg: [-6, -18, 12, 20, -14][index] ?? 0,
+      fontScale: [1.45, 1.14, 1.08, 0.92, 0.88][index] ?? 1,
+    }));
+
+  const exercises = mergedOptions.exerciseTypes.map((exerciseType, index) => ({
+    id: `demo-exercise-${index + 1}`,
+    exerciseType,
+    title:
+      exerciseType === "READ_ALOUD"
+        ? "Read the text out loud"
+        : exerciseType === "KEYWORD_QA"
+          ? "Answer the questions using key words"
+          : "Tell a story that includes the key words",
+    instructions:
+      exerciseType === "READ_ALOUD"
+        ? "Please read the text out loud paying attention to the keywords."
+        : exerciseType === "KEYWORD_QA"
+          ? "Use the highlighted key words naturally while answering each question."
+          : `Tell a story that includes the key words ${words.map((word) => word.term).join(", ")}.`,
+    referenceText:
+      exerciseType === "READ_ALOUD"
+        ? `English Talks created this exercise to practice the following words:\n\n${words.map((word) => `${word.term} - ${word.definition}`).join("\n")}`
+        : null,
+    questionBlock:
+      exerciseType === "KEYWORD_QA"
+        ? ["Questions:", ...words.map((word, wordIndex) => `${wordIndex + 1}. How would you use ${word.term} in a real conversation?`)].join("\n")
+        : null,
+    minDurationSeconds: mergedOptions.timerSeconds,
+    orderIndex: index + 1,
+  }));
+
+  return {
+    id: `demo-session-${Date.now()}`,
+    title: `${topics.map((topic) => topic.title).join(", ")} vocabulary practice`,
+    level: mergedOptions.level,
+    status: "READY",
+    topicSummary: topics.map((topic) => topic.title).join(", "),
+    targetMinutes: mergedOptions.targetMinutes,
+    timerSeconds: mergedOptions.timerSeconds,
+    feedbackMode: mergedOptions.feedbackMode,
+    accentFocus: mergedOptions.accentFocus,
+    advancedOptions: mergedOptions,
+    generatedPrompt: words.map((word) => `${word.term} - ${word.definition}`).join("\n"),
+    startedAt: new Date().toISOString(),
+    completedAt: null,
+    topics,
+    words,
+    exercises,
+    attempts: [],
+  };
+}
+
 export const vocabularyRouter = Router();
 
 vocabularyRouter.get("/topics", async (_req, res) => {
+  if (!databaseEnabled) {
+    return res.json({
+      defaultOptions: defaultVocabularyOptions,
+      topics: vocabularyTopics.map((topic) => ({
+        slug: topic.slug,
+        title: topic.title,
+        emoji: topic.emoji,
+        description: topic.description,
+        category: topic.category,
+        suggestedKeywords: (vocabularyKeywordBank[topic.slug] ?? []).slice(0, 3).map((keyword) => keyword.term),
+      })),
+    });
+  }
+
   const topics = await prisma.vocabularyTopic.findMany({
     where: { isActive: true },
     orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
@@ -145,6 +226,13 @@ vocabularyRouter.post("/sessions", async (req: AuthenticatedRequest, res) => {
 
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  if (!databaseEnabled) {
+    return res.status(201).json({
+      session: createDemoVocabularySession(parsed.data.topicSlugs, parsed.data.options),
+      mode: "stateless-demo",
+    });
   }
 
   const topics = await prisma.vocabularyTopic.findMany({
@@ -210,6 +298,10 @@ vocabularyRouter.post("/sessions", async (req: AuthenticatedRequest, res) => {
 });
 
 vocabularyRouter.get("/sessions/:sessionId", async (req, res) => {
+  if (!databaseEnabled) {
+    return res.status(404).json({ error: "Demo sessions are not persisted without Turso configuration" });
+  }
+
   const sessionId = String(req.params.sessionId);
   const session = await prisma.vocabularyPracticeSession.findUnique({
     where: { id: sessionId },
@@ -233,6 +325,22 @@ vocabularyRouter.post("/sessions/:sessionId/attempts", async (req: Authenticated
 
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  if (!databaseEnabled) {
+    return res.status(201).json({
+      attempt: {
+        id: `demo-attempt-${Date.now()}`,
+        sessionId: String(req.params.sessionId),
+        exerciseId: parsed.data.exerciseId,
+        transcriptText: parsed.data.transcriptText ?? null,
+        durationSeconds: parsed.data.durationSeconds ?? null,
+        feedbackSummary: parsed.data.feedbackSummary ?? "Saved in stateless demo mode",
+        status: parsed.data.status,
+        createdAt: new Date().toISOString(),
+      },
+      mode: "stateless-demo",
+    });
   }
 
   const sessionId = String(req.params.sessionId);

@@ -1,9 +1,9 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
-import type { NextFunction, Request, Response } from "express";
-import helmet from "helmet";
-import { config } from "./config.js";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
+import helmetImport from "helmet";
+import { config, databaseEnabled } from "./config.js";
 import { authRouter } from "./routes/auth.js";
 import { catalogRouter } from "./routes/catalog.js";
 import { practiceRouter } from "./routes/practice.js";
@@ -13,6 +13,7 @@ import { webhookRouter } from "./routes/webhooks.js";
 
 export function createApp() {
   const app = express();
+  const helmet = helmetImport as unknown as () => RequestHandler;
 
   app.use(
     cors({
@@ -29,6 +30,7 @@ export function createApp() {
     res.json({
       status: "ok",
       service: "english-talks-api",
+      databaseMode: databaseEnabled ? "persistent" : "stateless-demo",
       timestamp: new Date().toISOString(),
     });
   });

@@ -1,4 +1,5 @@
-import { defaultVocabularyOptions, type VocabularyAdvancedOptions, type VocabularyExerciseType } from "@english-talks/shared";
+import { defaultVocabularyOptions } from "../lib/api-content.js";
+import type { VocabularyAdvancedOptions, VocabularyExerciseType } from "../lib/api-models.js";
 import type { VocabularyTopic, VocabularyTopicKeyword } from "@prisma/client";
 
 type TopicWithKeywords = VocabularyTopic & {
@@ -113,4 +114,3 @@ export function createVocabularySessionBlueprint(topics: TopicWithKeywords[], ra
     exercises,
   };
 }
-

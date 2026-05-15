@@ -1,13 +1,17 @@
 import { createApp } from "./app.js";
-import { config } from "./config.js";
+import { config, databaseEnabled } from "./config.js";
 import { ensureSeedData } from "./lib/bootstrap.js";
 import { prisma } from "./lib/prisma.js";
 
 const app = createApp();
 
 async function start() {
-  await prisma.$connect();
-  await ensureSeedData();
+  if (databaseEnabled) {
+    await prisma.$connect();
+    await ensureSeedData();
+  } else {
+    console.log("English Talks API starting in stateless demo mode");
+  }
 
   app.listen(config.API_PORT, () => {
     console.log(`English Talks API listening on http://localhost:${config.API_PORT}`);
