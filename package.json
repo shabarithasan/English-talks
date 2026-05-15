@@ -1,0 +1,20 @@
+{
+  "name": "english-talks-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build --workspace @english-talks/shared && concurrently \"npm run dev:web\" \"npm run dev:api\"",
+    "dev:web": "npm run dev --workspace @english-talks/web",
+    "dev:api": "npm run dev --workspace @english-talks/api",
+    "build": "npm run build --workspace @english-talks/shared && npm run build --workspace @english-talks/web && npm run build --workspace @english-talks/api",
+    "typecheck": "npm run typecheck --workspace @english-talks/shared && npm run typecheck --workspace @english-talks/web && npm run typecheck --workspace @english-talks/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  }
+}

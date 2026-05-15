@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String         @id @default(cuid())
+  email            String         @unique
+  fullName         String
+  passwordHash     String?
+  googleId         String?        @unique
+  role             String         @default("LEARNER")
+  cefrLevel        String?
+  avatarUrl        String?
+  timezone         String?
+  preferredLocale  String         @default("en")
+  organizationId   String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  organization     Organization?  @relation(fields: [organizationId], references: [id])
+  sessions         Session[]
+  vocabularySessions VocabularyPracticeSession[]
+  vocabularyAttempts VocabularyAttempt[]
+  progress         Progress[]
+  certificates     Certificate[]
+  subscriptions    Subscription[]
+}
+
+model Organization {
+  id          String             @id @default(cuid())
+  name        String
+  type        String
+  industry    String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  users       User[]
+}
+
+model Session {
+  id                String          @id @default(cuid())
+  userId            String
+  type              String
+  status            String          @default("DRAFT")
+  startedAt         DateTime        @default(now())
+  completedAt       DateTime?
+  durationSeconds   Int?
+  promptTitle       String?
+  audioUrl          String?
+  transcript        Transcript?
+  assessment        Assessment?
+  courseId          String?
+  user              User            @relation(fields: [userId], references: [id])
+  course            Course?         @relation(fields: [courseId], references: [id])
+}
+
+model Transcript {
+  id              String             @id @default(cuid())
+  sessionId       String             @unique
+  fullText        String
+  languageCode    String             @default("en")
+  confidence      Float?
+  createdAt       DateTime           @default(now())
+  session         Session            @relation(fields: [sessionId], references: [id])
+  segments        TranscriptSegment[]
+}
+
+model TranscriptSegment {
+  id            String      @id @default(cuid())
+  transcriptId  String
+  startMs       Int
+  endMs         Int
+  speakerLabel  String?
+  text          String
+  transcript    Transcript  @relation(fields: [transcriptId], references: [id])
+}
+
+model Assessment {
+  id                String    @id @default(cuid())
+  sessionId         String    @unique
+  overallScore      Float
+  rubric            String
+  grammarScore      Float?
+  vocabularyScore   Float?
+  fluencyScore      Float?
+  pronunciationScore Float?
+  cefrLevel         String?
+  feedbackText      String
+  createdAt         DateTime  @default(now())
+  session           Session   @relation(fields: [sessionId], references: [id])
+}
+
+model Course {
+  id            String      @id @default(cuid())
+  slug          String      @unique
+  title         String
+  description   String
+  category      String
+  targetLevel   String
+  estimatedDays Int?
+  lessons       Lesson[]
+  sessions      Session[]
+}
+
+model Lesson {
+  id             String      @id @default(cuid())
+  courseId       String
+  title          String
+  slug           String
+  contentType    String
+  promptText     String?
+  orderIndex     Int
+  durationMinutes Int?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  course         Course      @relation(fields: [courseId], references: [id])
+  progress       Progress[]
+
+  @@unique([courseId, slug])
+}
+
+model Progress {
+  id            String      @id @default(cuid())
+  userId        String
+  lessonId      String
+  status        String      @default("NOT_STARTED")
+  score         Float?
+  completedAt   DateTime?
+  lastViewedAt  DateTime?
+  user          User        @relation(fields: [userId], references: [id])
+  lesson        Lesson      @relation(fields: [lessonId], references: [id])
+
+  @@unique([userId, lessonId])
+}
+
+model Certificate {
+  id            String      @id @default(cuid())
+  userId        String
+  title         String
+  level         String
+  issuedAt      DateTime    @default(now())
+  certificateUrl String?
+  verificationCode String   @unique
+  user          User        @relation(fields: [userId], references: [id])
+}
+
+model Subscription {
+  id                    String    @id @default(cuid())
+  userId                String
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+  planCode              String
+  status                String
+  renewalDate           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id])
+}
+
+model VocabularyTopic {
+  id            String                   @id @default(cuid())
+  slug          String                   @unique
+  title         String
+  emoji         String
+  description   String
+  category      String
+  sortOrder     Int                      @default(0)
+  isActive      Boolean                  @default(true)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  keywords      VocabularyTopicKeyword[]
+  sessions      VocabularySessionTopic[]
+}
+
+model VocabularyTopicKeyword {
+  id            String             @id @default(cuid())
+  topicId       String
+  term          String
+  definition    String
+  samplePrompt  String
+  sortOrder     Int                @default(0)
+  topic         VocabularyTopic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, term])
+}
+
+model VocabularyPracticeSession {
+  id                String                   @id @default(cuid())
+  userId            String?
+  title             String
+  level             String
+  status            String                   @default("DRAFT")
+  topicSummary      String
+  advancedOptions   String
+  targetMinutes     Int
+  timerSeconds      Int
+  feedbackMode      String
+  accentFocus       String
+  generatedPrompt   String?
+  startedAt         DateTime                 @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  user              User?                    @relation(fields: [userId], references: [id])
+  topics            VocabularySessionTopic[]
+  words             VocabularyPracticeWord[]
+  exercises         VocabularyExercise[]
+  attempts          VocabularyAttempt[]
+}
+
+model VocabularySessionTopic {
+  id         String                    @id @default(cuid())
+  sessionId  String
+  topicId    String
+  session    VocabularyPracticeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  topic      VocabularyTopic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, topicId])
+}
+
+model VocabularyPracticeWord {
+  id             String                    @id @default(cuid())
+  sessionId      String
+  term           String
+  definition     String
+  samplePrompt   String
+  emphasisRank   Int
+  positionX      Float
+  positionY      Float
+  rotationDeg    Int
+  fontScale      Float
+  session        VocabularyPracticeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model VocabularyExercise {
+  id                 String                    @id @default(cuid())
+  sessionId          String
+  exerciseType       String
+  title              String
+  instructions       String
+  referenceText      String?
+  questionBlock      String?
+  minDurationSeconds Int                       @default(60)
+  orderIndex         Int
+  session            VocabularyPracticeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  attempts           VocabularyAttempt[]
+}
+
+model VocabularyAttempt {
+  id                String                    @id @default(cuid())
+  sessionId         String
+  exerciseId        String
+  userId            String?
+  transcriptText    String?
+  audioUrl          String?
+  durationSeconds   Int?
+  feedbackSummary   String?
+  status            String                    @default("SAVED")
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  session           VocabularyPracticeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise          VocabularyExercise        @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  user              User?                     @relation(fields: [userId], references: [id])
+}

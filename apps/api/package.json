@@ -1,0 +1,43 @@
+{
+  "name": "@english-talks/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "npm run db:push && npm run build --workspace @english-talks/shared",
+    "dev": "tsx watch src/index.ts",
+    "prebuild": "npm run db:generate && npm run build --workspace @english-talks/shared",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "pretypecheck": "npm run db:generate && npm run build --workspace @english-talks/shared",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push --skip-generate && prisma generate",
+    "db:seed": "npm run build --workspace @english-talks/shared && tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@english-talks/shared": "*",
+    "@prisma/adapter-libsql": "^6.19.0",
+    "@prisma/client": "^6.18.0",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.10.1",
+    "prisma": "^6.18.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
