@@ -199,6 +199,7 @@ export function VocabularyBoosterExperience() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const savedAudioUrlsRef = useRef<string[]>([]);
+  const stopPromiseResolverRef = useRef<((audioUrl: string | null) => void) | null>(null);
 
   const currentExercise = session?.exercises[exerciseIndex] ?? null;
 
@@ -225,13 +226,59 @@ export function VocabularyBoosterExperience() {
     };
   }, [lastAudioUrl]);
 
+  function getSupportedMimeType() {
+    if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
+      return undefined;
+    }
+
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/ogg;codecs=opus",
+    ];
+
+    return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate));
+  }
+
+  function clearSavedAudioState() {
+    if (lastAudioUrl) {
+      URL.revokeObjectURL(lastAudioUrl);
+      setLastAudioUrl(null);
+    }
+
+    savedAudioUrlsRef.current.forEach((audioUrl) => URL.revokeObjectURL(audioUrl));
+    savedAudioUrlsRef.current = [];
+    setSavedRecordings([]);
+  }
+
+  async function stopRecordingAndFinalize() {
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder) {
+      return lastAudioUrl;
+    }
+
+    if (recorder.state === "inactive") {
+      return lastAudioUrl;
+    }
+
+    const audioUrl = await new Promise<string | null>((resolve) => {
+      stopPromiseResolverRef.current = resolve;
+      recorder.stop();
+    });
+
+    setIsRecording(false);
+    setIsPaused(true);
+
+    return audioUrl;
+  }
+
   async function handleStartRecording() {
     setError(null);
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setError("Microphone recording is not supported in this browser. You can still type notes and save the attempt.");
-      setIsRecording(true);
-      setIsPaused(false);
       return;
     }
 
@@ -241,8 +288,10 @@ export function VocabularyBoosterExperience() {
       }
 
       if (!mediaRecorderRef.current) {
-        const recorder = new MediaRecorder(mediaStreamRef.current);
-        audioChunksRef.current = [];
+        const mimeType = getSupportedMimeType();
+        const recorder = mimeType
+          ? new MediaRecorder(mediaStreamRef.current, { mimeType })
+          : new MediaRecorder(mediaStreamRef.current);
 
         recorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
@@ -252,42 +301,50 @@ export function VocabularyBoosterExperience() {
 
         recorder.onstop = () => {
           if (audioChunksRef.current.length === 0) {
+            stopPromiseResolverRef.current?.(null);
+            stopPromiseResolverRef.current = null;
             return;
           }
 
-          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          const blobType = recorder.mimeType || "audio/webm";
+          const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
           if (lastAudioUrl) {
             URL.revokeObjectURL(lastAudioUrl);
           }
-          setLastAudioUrl(URL.createObjectURL(audioBlob));
+          const audioUrl = URL.createObjectURL(audioBlob);
+          setLastAudioUrl(audioUrl);
+          stopPromiseResolverRef.current?.(audioUrl);
+          stopPromiseResolverRef.current = null;
         };
 
         mediaRecorderRef.current = recorder;
       }
 
-      if (mediaRecorderRef.current.state === "inactive") {
-        mediaRecorderRef.current.start();
+      if (mediaRecorderRef.current.state === "paused") {
+        mediaRecorderRef.current.resume();
+      } else if (mediaRecorderRef.current.state === "inactive") {
+        audioChunksRef.current = [];
+        mediaRecorderRef.current.start(250);
       }
 
       setIsRecording(true);
       setIsPaused(false);
     } catch {
       setError("Microphone permission was denied. You can continue with typed notes and manual progress tracking.");
-      setIsRecording(true);
-      setIsPaused(false);
+      setIsRecording(false);
+      setIsPaused(true);
     }
   }
 
   function handlePauseRecording() {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.pause();
+    }
     setIsPaused(true);
   }
 
-  function handleStopRecording() {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-    setIsPaused(true);
+  async function handleStopRecording() {
+    await stopRecordingAndFinalize();
   }
 
   function toggleTopic(slug: string) {
@@ -341,19 +398,19 @@ export function VocabularyBoosterExperience() {
       }
 
       const payload = (await response.json()) as { session: VocabularySessionData };
+      clearSavedAudioState();
       setSession(payload.session);
       setExerciseIndex(0);
       setAttemptsSaved([]);
-      setSavedRecordings([]);
       setNotes("");
       setElapsedSeconds(0);
       setStage("cloud");
     } catch {
       const fallbackSession = createFallbackSession(selectedTopics, options);
+      clearSavedAudioState();
       setSession(fallbackSession);
       setExerciseIndex(0);
       setAttemptsSaved([]);
-      setSavedRecordings([]);
       setNotes("");
       setElapsedSeconds(0);
       setStage("cloud");
@@ -369,8 +426,13 @@ export function VocabularyBoosterExperience() {
     }
 
     setLoading(true);
+    let audioUrlForSave = lastAudioUrl;
 
     try {
+      if (mediaRecorderRef.current?.state && mediaRecorderRef.current.state !== "inactive") {
+        audioUrlForSave = await stopRecordingAndFinalize();
+      }
+
       await fetch(`${apiBaseUrl}/api/v1/vocabulary/sessions/${session.id}/attempts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -390,13 +452,14 @@ export function VocabularyBoosterExperience() {
     } catch {
       setError("Attempt could not be saved to the backend, but your local progress is still preserved on this page.");
     } finally {
-      if (lastAudioUrl) {
-        savedAudioUrlsRef.current.push(lastAudioUrl);
+      if (audioUrlForSave) {
+        const finalizedAudioUrl = audioUrlForSave;
+        savedAudioUrlsRef.current.push(finalizedAudioUrl);
         setSavedRecordings((current) => [
           {
             exerciseId: currentExercise.id,
             exerciseTitle: currentExercise.title,
-            audioUrl: lastAudioUrl,
+            audioUrl: finalizedAudioUrl,
             durationSeconds: elapsedSeconds,
             createdAt: new Date().toISOString(),
           },
@@ -820,6 +883,10 @@ export function VocabularyBoosterExperience() {
               {exerciseIndex === session.exercises.length - 1 ? "Finish" : "Next"}
             </button>
           </div>
+
+          <p className="muted" style={{ margin: 0 }}>
+            Recording is saved automatically when you press {exerciseIndex === session.exercises.length - 1 ? "Finish" : "Next"}, so you do not need to press Stop first.
+          </p>
 
           {attemptsSaved.length > 0 ? (
             <div className="stack-sm">
