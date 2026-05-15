@@ -18,6 +18,13 @@ model User {
   avatarUrl        String?
   timezone         String?
   preferredLocale  String         @default("en")
+  onboardingCompleted Boolean     @default(false)
+  targetExam       String?
+  targetBand       Float?
+  studyReason      String?
+  streakCount      Int            @default(0)
+  xpPoints         Int            @default(0)
+  lastActiveAt     DateTime?
   organizationId   String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
@@ -28,6 +35,8 @@ model User {
   progress         Progress[]
   certificates     Certificate[]
   subscriptions    Subscription[]
+  authSessions     AuthSession[]
+  analyticsEvents  AnalyticsEvent[]
 }
 
 model Organization {
@@ -44,12 +53,26 @@ model Session {
   id                String          @id @default(cuid())
   userId            String
   type              String
-  status            String          @default("DRAFT")
+  status            String          @default("CREATED")
+  rubric            String          @default("cefr")
+  transcriptStatus  String          @default("PENDING")
+  scoringStatus     String          @default("PENDING")
+  reviewStatus      String          @default("PENDING")
   startedAt         DateTime        @default(now())
+  createdAt         DateTime        @default(now())
   completedAt       DateTime?
   durationSeconds   Int?
   promptTitle       String?
   audioUrl          String?
+  audioMimeType     String?
+  audioBytes        Int?
+  audioStorageKey   String?
+  uploadedAt        DateTime?
+  transcribedAt     DateTime?
+  scoredAt          DateTime?
+  reviewedAt        DateTime?
+  processingError   String?
+  reportUrl         String?
   transcript        Transcript?
   assessment        Assessment?
   courseId          String?
@@ -89,6 +112,11 @@ model Assessment {
   pronunciationScore Float?
   cefrLevel         String?
   feedbackText      String
+  feedbackJson      String?
+  strengths         String?
+  weaknesses        String?
+  nextSteps         String?
+  estimatedBandLabel String?
   createdAt         DateTime  @default(now())
   session           Session   @relation(fields: [sessionId], references: [id])
 }
@@ -150,14 +178,48 @@ model Certificate {
 model Subscription {
   id                    String    @id @default(cuid())
   userId                String
+  provider              String    @default("LOCAL")
   stripeCustomerId      String?   @unique
   stripeSubscriptionId  String?   @unique
+  checkoutSessionId     String?   @unique
   planCode              String
   status                String
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
   renewalDate           DateTime?
+  cancelAtPeriodEnd     Boolean   @default(false)
+  entitledFeatures      String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   user                  User      @relation(fields: [userId], references: [id])
+}
+
+model AuthSession {
+  id                String    @id @default(cuid())
+  userId            String
+  refreshTokenHash  String    @unique
+  userAgent         String?
+  ipAddress         String?
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  lastUsedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AnalyticsEvent {
+  id           String    @id @default(cuid())
+  userId       String?
+  eventName    String
+  eventGroup   String?
+  path         String?
+  properties   String?
+  createdAt    DateTime  @default(now())
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventName, createdAt])
+  @@index([userId, createdAt])
 }
 
 model VocabularyTopic {

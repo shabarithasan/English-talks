@@ -3,7 +3,7 @@ import { marketingPages } from "../lib/site-content";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_MARKETING_SITE_URL ?? "http://localhost:3000";
-  const staticRoutes = ["", "business", "schools", "programs", "dashboard", "practice", "results"];
+  const staticRoutes = ["", "business", "schools", "programs", "dashboard", "practice", "results", "subscriptions"];
 
   return [
     ...staticRoutes.map((route) => ({

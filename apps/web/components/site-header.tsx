@@ -8,6 +8,7 @@ const links = [
   { href: "/jobinterview", label: "Interviews" },
   { href: "/business", label: "Business" },
   { href: "/schools", label: "Schools" },
+  { href: "/subscriptions", label: "Pricing" },
 ];
 
 export function SiteHeader() {
