@@ -1,6 +1,7 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import type { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import { config } from "./config.js";
 import { authRouter } from "./routes/auth.js";
@@ -38,6 +39,21 @@ export function createApp() {
   app.use("/api/v1/practice", practiceRouter);
   app.use("/api/v1/vocabulary", vocabularyRouter);
   app.use("/api/v1/webhooks", webhookRouter);
+
+  app.use((_req, res) => {
+    res.status(404).json({
+      error: "Route not found",
+    });
+  });
+
+  // Vercel recommends robust error handling for Express so failed requests don't leave the
+  // serverless function in an undefined state.
+  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("Unhandled API error", error);
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  });
 
   return app;
 }

@@ -9,6 +9,8 @@ This repository is a clean-room implementation for `English Talks`, an AI-driven
 - `packages/shared`: shared product metadata, routes, and domain types
 - `docs`: implementation architecture, backlog, and developer handoff material
 - `apps/api/prisma/schema.prisma`: relational schema for the proposed platform
+- `.github/workflows/ci.yml`: GitHub Actions build and typecheck pipeline
+- `LICENSE`: MIT license
 
 ## Quick start
 
@@ -80,6 +82,10 @@ The starter includes routes and content scaffolding for:
 3. Profile update and password change endpoints.
 4. Persistent speaking session, transcript, and assessment records.
 5. Optional Turso-backed cloud persistence for the same Prisma models.
+
+## Deployment
+
+Production deployment guidance for Vercel + Turso is documented in [docs/deployment-vercel-turso.md](/C:/Users/shaba/OneDrive/Documents/English speech pratices app/docs/deployment-vercel-turso.md).
 
 ## Next implementation steps
 
