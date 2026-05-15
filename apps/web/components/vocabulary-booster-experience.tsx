@@ -67,6 +67,14 @@ type VocabularySessionData = {
   }[];
 };
 
+type SavedRecording = {
+  exerciseId: string;
+  exerciseTitle: string;
+  audioUrl: string;
+  durationSeconds: number;
+  createdAt: string;
+};
+
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 const exerciseTypeLabels: Record<VocabularyExerciseType, string> = {
@@ -185,10 +193,12 @@ export function VocabularyBoosterExperience() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastAudioUrl, setLastAudioUrl] = useState<string | null>(null);
+  const [savedRecordings, setSavedRecordings] = useState<SavedRecording[]>([]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const savedAudioUrlsRef = useRef<string[]>([]);
 
   const currentExercise = session?.exercises[exerciseIndex] ?? null;
 
@@ -211,6 +221,7 @@ export function VocabularyBoosterExperience() {
       if (lastAudioUrl) {
         URL.revokeObjectURL(lastAudioUrl);
       }
+      savedAudioUrlsRef.current.forEach((audioUrl) => URL.revokeObjectURL(audioUrl));
     };
   }, [lastAudioUrl]);
 
@@ -333,6 +344,7 @@ export function VocabularyBoosterExperience() {
       setSession(payload.session);
       setExerciseIndex(0);
       setAttemptsSaved([]);
+      setSavedRecordings([]);
       setNotes("");
       setElapsedSeconds(0);
       setStage("cloud");
@@ -341,6 +353,7 @@ export function VocabularyBoosterExperience() {
       setSession(fallbackSession);
       setExerciseIndex(0);
       setAttemptsSaved([]);
+      setSavedRecordings([]);
       setNotes("");
       setElapsedSeconds(0);
       setStage("cloud");
@@ -377,12 +390,27 @@ export function VocabularyBoosterExperience() {
     } catch {
       setError("Attempt could not be saved to the backend, but your local progress is still preserved on this page.");
     } finally {
+      if (lastAudioUrl) {
+        savedAudioUrlsRef.current.push(lastAudioUrl);
+        setSavedRecordings((current) => [
+          {
+            exerciseId: currentExercise.id,
+            exerciseTitle: currentExercise.title,
+            audioUrl: lastAudioUrl,
+            durationSeconds: elapsedSeconds,
+            createdAt: new Date().toISOString(),
+          },
+          ...current,
+        ]);
+      }
+
       setAttemptsSaved((current) => [...current, currentExercise.id]);
       setNotes("");
       setElapsedSeconds(0);
       setIsRecording(false);
       setIsPaused(true);
       setLoading(false);
+      setLastAudioUrl(null);
 
       if (exerciseIndex >= session.exercises.length - 1) {
         setStage("complete");
@@ -726,8 +754,33 @@ export function VocabularyBoosterExperience() {
 
               {lastAudioUrl ? (
                 <div className="panel route-card stack-sm">
-                  <strong>Last recording preview</strong>
-                  <audio controls src={lastAudioUrl} />
+                  <strong>Current recording preview</strong>
+                  <audio controls src={lastAudioUrl} preload="metadata" />
+                  <p className="muted" style={{ margin: 0 }}>
+                    Review this take before you save the exercise.
+                  </p>
+                </div>
+              ) : null}
+
+              {savedRecordings.length > 0 ? (
+                <div className="panel route-card stack-sm">
+                  <strong>Saved recordings</strong>
+                  <div className="vocab-saved-recordings">
+                    {savedRecordings.map((recording, index) => (
+                      <article
+                        key={`${recording.exerciseId}-${recording.createdAt}`}
+                        className="vocab-saved-recording"
+                      >
+                        <div className="vocab-saved-recording-header">
+                          <strong>{recording.exerciseTitle}</strong>
+                          <span className="muted">
+                            Take {savedRecordings.length - index} · {formatTimer(recording.durationSeconds)}
+                          </span>
+                        </div>
+                        <audio controls src={recording.audioUrl} preload="metadata" />
+                      </article>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </aside>
@@ -769,9 +822,16 @@ export function VocabularyBoosterExperience() {
           </div>
 
           {attemptsSaved.length > 0 ? (
-            <p className="muted" style={{ margin: 0 }}>
-              Saved attempts: {attemptsSaved.length} / {session.exercises.length}
-            </p>
+            <div className="stack-sm">
+              <p className="muted" style={{ margin: 0 }}>
+                Saved attempts: {attemptsSaved.length} / {session.exercises.length}
+              </p>
+              {savedRecordings.length > 0 ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  Manual review ready: {savedRecordings.length} saved recording{savedRecordings.length === 1 ? "" : "s"}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -788,6 +848,27 @@ export function VocabularyBoosterExperience() {
               areas. The backend can now keep session settings, keyword sets, and saved attempts for
               later reporting and feedback.
             </p>
+            {savedRecordings.length > 0 ? (
+              <div className="panel route-card stack-sm">
+                <strong>Listen to your saved recordings</strong>
+                <div className="vocab-saved-recordings">
+                  {savedRecordings.map((recording, index) => (
+                    <article
+                      key={`${recording.exerciseId}-${recording.createdAt}`}
+                      className="vocab-saved-recording"
+                    >
+                      <div className="vocab-saved-recording-header">
+                        <strong>{recording.exerciseTitle}</strong>
+                        <span className="muted">
+                          Clip {savedRecordings.length - index} · {formatTimer(recording.durationSeconds)}
+                        </span>
+                      </div>
+                      <audio controls src={recording.audioUrl} preload="metadata" />
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
               <button className="button-primary" type="button" onClick={() => setStage("topics")}>
                 Create another session

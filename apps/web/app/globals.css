@@ -518,6 +518,31 @@ button {
   border-bottom: 1px solid rgba(19, 42, 42, 0.08);
 }
 
+.vocab-saved-recordings {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.vocab-saved-recording {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(19, 42, 42, 0.08);
+}
+
+.vocab-saved-recording audio {
+  width: 100%;
+}
+
+.vocab-saved-recording-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 .vocab-recorder-bar {
   padding-top: 0.5rem;
   border-top: 1px solid rgba(19, 42, 42, 0.08);
@@ -559,7 +584,8 @@ button {
   .vocab-builder-header,
   .vocab-exercise-topbar,
   .vocab-stage-actions,
-  .vocab-recorder-bar {
+  .vocab-recorder-bar,
+  .vocab-saved-recording-header {
     flex-direction: column;
     align-items: stretch;
   }
