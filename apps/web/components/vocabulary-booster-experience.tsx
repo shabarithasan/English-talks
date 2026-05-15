@@ -6,9 +6,8 @@ import {
   defaultVocabularyOptions,
   vocabularyKeywordBank,
   vocabularyTopics,
-  type VocabularyAdvancedOptions,
-  type VocabularyExerciseType,
-} from "@english-talks/shared";
+} from "../lib/site-content";
+import type { VocabularyAdvancedOptions, VocabularyExerciseType } from "../lib/site-models";
 
 type TopicSummary = {
   slug: string;
@@ -809,4 +808,3 @@ export function VocabularyBoosterExperience() {
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { marketingPages } from "@english-talks/shared";
+import { marketingPages } from "../lib/site-content";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_MARKETING_SITE_URL ?? "http://localhost:3000";

@@ -3,17 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "npm run build --workspace @english-talks/shared",
     "dev": "next dev",
-    "prebuild": "npm run build --workspace @english-talks/shared",
     "build": "next build",
     "start": "next start",
-    "pretypecheck": "npm run build --workspace @english-talks/shared",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "next lint"
   },
   "dependencies": {
-    "@english-talks/shared": "*",
     "clsx": "^2.1.1",
     "lucide-react": "^0.554.0",
     "next": "^16.0.3",

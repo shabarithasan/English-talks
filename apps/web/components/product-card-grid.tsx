@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { productCards } from "@english-talks/shared";
+import { productCards } from "../lib/site-content";
 
 export function ProductCardGrid() {
   return (

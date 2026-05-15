@@ -1,4 +1,4 @@
-import { enterpriseHighlights } from "@english-talks/shared";
+import { enterpriseHighlights } from "../../lib/site-content";
 import { PageHero } from "../../components/page-hero";
 
 export default function BusinessPage() {

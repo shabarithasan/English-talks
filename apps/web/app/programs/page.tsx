@@ -1,4 +1,4 @@
-import { courseTracks } from "@english-talks/shared";
+import { courseTracks } from "../../lib/site-content";
 import Link from "next/link";
 
 export default function ProgramsPage() {

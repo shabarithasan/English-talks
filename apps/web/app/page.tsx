@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, AudioLines, BriefcaseBusiness, GraduationCap, Sparkles } from "lucide-react";
-import { courseTracks, enterpriseHighlights } from "@english-talks/shared";
+import { courseTracks, enterpriseHighlights } from "../lib/site-content";
 import { DashboardPreview } from "../components/dashboard-preview";
 import { ProductCardGrid } from "../components/product-card-grid";
 

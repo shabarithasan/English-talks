@@ -1,4 +1,4 @@
-import { dashboardMetrics } from "@english-talks/shared";
+import { dashboardMetrics } from "../../lib/site-content";
 import Link from "next/link";
 
 const recommendations = [

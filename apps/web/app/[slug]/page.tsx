@@ -1,4 +1,4 @@
-import { marketingPages } from "@english-talks/shared";
+import { marketingPages } from "../../lib/site-content";
 import { notFound } from "next/navigation";
 import { PageHero } from "../../components/page-hero";
 
