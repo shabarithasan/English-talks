@@ -16,7 +16,7 @@ const displayFont = Fraunces({
 
 export const metadata: Metadata = {
   title: "English Talks",
-  description: "AI English speaking practice, assessments, and learning paths.",
+  description: "AI English speaking practice, IELTS coaching, assessments, and learning paths.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
