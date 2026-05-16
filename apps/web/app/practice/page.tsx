@@ -18,7 +18,31 @@ const ieltsPrompts = [
 ];
 
 function formatScore(score: number | null | undefined) {
-  return typeof score === "number" ? score.toFixed(1) : "—";
+  return typeof score === "number" ? score.toFixed(1) : "-";
+}
+
+function formatProviderLabel(provider: string | null | undefined) {
+  if (!provider) {
+    return "Unavailable";
+  }
+
+  if (provider.startsWith("openai:")) {
+    return `OpenAI (${provider.replace("openai:", "")})`;
+  }
+
+  if (provider === "local-assessment-fallback") {
+    return "Backup IELTS rubric engine";
+  }
+
+  if (provider === "local-speech-provider") {
+    return "Local development transcript";
+  }
+
+  if (provider === "local-assessment-provider") {
+    return "Local development scoring";
+  }
+
+  return provider;
 }
 
 export default function PracticePage() {
@@ -235,7 +259,7 @@ export default function PracticePage() {
 
           <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
             <button className="button-primary" type="button" onClick={beginRecording} disabled={recordingState === "recording"}>
-              {recordingState === "recording" ? "Recording…" : "Start recording"}
+              {recordingState === "recording" ? "Recording..." : "Start recording"}
             </button>
             <button className="button-secondary" type="button" onClick={stopRecording} disabled={recordingState !== "recording"}>
               Stop recording
@@ -268,7 +292,7 @@ export default function PracticePage() {
           ) : null}
 
           <button className="button-primary" type="button" onClick={runIeltsSession} disabled={loading || !audioFile}>
-            {loading ? "Scoring answer…" : "Generate IELTS report"}
+            {loading ? "Scoring answer..." : "Generate IELTS report"}
           </button>
         </article>
 
@@ -296,10 +320,18 @@ export default function PracticePage() {
                 <p className="muted" style={{ margin: 0 }}>
                   {currentSession.assessment?.feedbackText ?? "Assessment details will appear here."}
                 </p>
+                <p className="muted" style={{ margin: 0 }}>
+                  Feedback engine: {formatProviderLabel(currentSession.assessment?.provider)}
+                  {currentSession.assessment?.inferenceLatencyMs ? ` · ${currentSession.assessment.inferenceLatencyMs} ms` : ""}
+                </p>
               </div>
 
               <div className="panel route-card stack-sm">
                 <strong>Transcript</strong>
+                <p className="muted" style={{ margin: 0 }}>
+                  {formatProviderLabel(currentSession.transcript?.provider)}
+                  {currentSession.transcript?.transcriptionLatencyMs ? ` · ${currentSession.transcript.transcriptionLatencyMs} ms` : ""}
+                </p>
                 <p style={{ margin: 0 }}>{currentSession.transcript?.fullText ?? "Transcript not available."}</p>
               </div>
 

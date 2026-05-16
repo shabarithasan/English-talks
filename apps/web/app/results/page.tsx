@@ -2,28 +2,55 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getSessions, markSessionReviewed, recordClientAnalytics } from "../../lib/api-client";
+import { getSessions, markSessionReviewed, rateSessionFeedback, recordClientAnalytics } from "../../lib/api-client";
 import type { LearnerSession } from "../../lib/learner-types";
+
+function formatProviderLabel(provider: string | null | undefined) {
+  if (!provider) {
+    return "Unavailable";
+  }
+
+  if (provider.startsWith("openai:")) {
+    return `OpenAI (${provider.replace("openai:", "")})`;
+  }
+
+  if (provider === "local-assessment-fallback") {
+    return "Backup IELTS rubric engine";
+  }
+
+  if (provider === "local-speech-provider") {
+    return "Local development transcript";
+  }
+
+  if (provider === "local-assessment-provider") {
+    return "Local development scoring";
+  }
+
+  return provider;
+}
 
 export default function ResultsPage() {
   const [sessions, setSessions] = useState<LearnerSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [ratingBusy, setRatingBusy] = useState(false);
 
   useEffect(() => {
     async function loadSessions() {
       try {
         const response = await getSessions();
-        setSessions(response.sessions.filter((session) => session.rubric === "ielts"));
-        setSelectedSessionId(response.sessions[0]?.id ?? null);
+        const ieltsSessions = response.sessions.filter((session) => session.rubric === "ielts");
+        setSessions(ieltsSessions);
+        setSelectedSessionId(ieltsSessions[0]?.id ?? null);
         await recordClientAnalytics([
           {
             eventName: "results.view",
             eventGroup: "engagement",
             path: "/results",
             properties: {
-              sessionCount: response.sessions.length,
+              sessionCount: ieltsSessions.length,
             },
           },
         ]);
@@ -41,11 +68,32 @@ export default function ResultsPage() {
 
   async function handleReview(sessionId: string) {
     try {
+      setError(null);
       const updated = await markSessionReviewed(sessionId);
       setSessions((current) => current.map((session) => (session.id === updated.session.id ? updated.session : session)));
       setSelectedSessionId(updated.session.id);
+      setInfo("Session marked as reviewed.");
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Could not update review status");
+    }
+  }
+
+  async function handleHelpfulness(rating: number) {
+    if (!selectedSession) {
+      return;
+    }
+
+    try {
+      setRatingBusy(true);
+      setError(null);
+      const updated = await rateSessionFeedback(selectedSession.id, { rating });
+      setSessions((current) => current.map((session) => (session.id === updated.session.id ? updated.session : session)));
+      setSelectedSessionId(updated.session.id);
+      setInfo("Thanks. Your feedback rating was saved.");
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Could not save your feedback rating");
+    } finally {
+      setRatingBusy(false);
     }
   }
 
@@ -53,7 +101,7 @@ export default function ResultsPage() {
     return (
       <section className="panel section-space stack-md">
         <span className="pill">IELTS results</span>
-        <h1 className="headline">Loading your saved speaking history…</h1>
+        <h1 className="headline">Loading your saved speaking history...</h1>
       </section>
     );
   }
@@ -99,7 +147,7 @@ export default function ResultsPage() {
                 <div key={item.label} className="panel route-card stack-sm">
                   <span className="muted">{item.label}</span>
                   <strong style={{ fontSize: "1.7rem" }}>
-                    {typeof item.value === "number" ? item.value.toFixed(1) : "—"}
+                    {typeof item.value === "number" ? item.value.toFixed(1) : "-"}
                   </strong>
                 </div>
               ))}
@@ -107,6 +155,10 @@ export default function ResultsPage() {
 
             <div className="panel route-card stack-sm">
               <strong>Transcript</strong>
+              <p className="muted" style={{ margin: 0 }}>
+                {formatProviderLabel(selectedSession.transcript?.provider)}
+                {selectedSession.transcript?.transcriptionLatencyMs ? ` · ${selectedSession.transcript.transcriptionLatencyMs} ms` : ""}
+              </p>
               <p style={{ margin: 0 }}>{selectedSession.transcript?.fullText ?? "Transcript unavailable."}</p>
             </div>
 
@@ -117,6 +169,35 @@ export default function ResultsPage() {
                   <li key={step}>{step}</li>
                 ))}
               </ul>
+            </div>
+
+            <div className="panel route-card stack-sm">
+              <strong>Feedback quality</strong>
+              <p className="muted" style={{ margin: 0 }}>
+                {formatProviderLabel(selectedSession.assessment?.provider)}
+                {selectedSession.assessment?.inferenceLatencyMs ? ` · ${selectedSession.assessment.inferenceLatencyMs} ms` : ""}
+              </p>
+              <p style={{ margin: 0 }}>Was this IELTS feedback helpful for your next attempt?</p>
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                {[
+                  { label: "Not useful", rating: 1 },
+                  { label: "Somewhat helpful", rating: 3 },
+                  { label: "Very helpful", rating: 5 },
+                ].map((option) => (
+                  <button
+                    key={option.label}
+                    className={selectedSession.assessment?.helpfulnessRating === option.rating ? "button-primary" : "button-secondary"}
+                    type="button"
+                    onClick={() => handleHelpfulness(option.rating)}
+                    disabled={ratingBusy}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {selectedSession.assessment?.helpfulnessRating ? (
+                <span className="muted">Saved rating: {selectedSession.assessment.helpfulnessRating}/5</span>
+              ) : null}
             </div>
 
             <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
@@ -169,6 +250,12 @@ export default function ResultsPage() {
           </p>
         </section>
       )}
+
+      {info ? (
+        <div className="panel route-card">
+          <p style={{ margin: 0, color: "var(--teal-dark)" }}>{info}</p>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="panel route-card">
