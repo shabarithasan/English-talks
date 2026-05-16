@@ -1,18 +1,24 @@
-import type { BillingPlan, DashboardResponse, LearnerSession, LearnerUser, SubscriptionEntitlement } from "./learner-types";
+import type { AuthStatus, BillingPlan, DashboardResponse, LearnerSession, LearnerUser, SubscriptionEntitlement } from "./learner-types";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type JsonRecord = Record<string, unknown>;
 
 async function request<T>(path: string, init?: RequestInit, retryOnRefresh = true): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch {
+    throw new Error("The app could not reach the English Talks API. Please try again in a moment.");
+  }
 
   if (response.status === 401 && retryOnRefresh) {
     const refreshResponse = await fetch(`${apiBaseUrl}/api/v1/auth/refresh`, {
@@ -60,6 +66,12 @@ export async function logoutUser() {
 
 export async function getCurrentUser() {
   return request<{ user: LearnerUser }>("/api/v1/auth/me");
+}
+
+export async function getAuthStatus() {
+  return request<AuthStatus>("/api/v1/auth/status", {
+    cache: "no-store",
+  }, false);
 }
 
 export async function getGoogleAuthorizationUrl() {
@@ -124,6 +136,13 @@ export async function getPracticeSession(sessionId: string) {
 export async function markSessionReviewed(sessionId: string) {
   return request<{ session: LearnerSession }>(`/api/v1/practice/sessions/${sessionId}/review`, {
     method: "POST",
+  });
+}
+
+export async function rateSessionFeedback(sessionId: string, payload: { rating: number; comment?: string }) {
+  return request<{ session: LearnerSession }>(`/api/v1/practice/sessions/${sessionId}/helpfulness`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

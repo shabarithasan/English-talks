@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   completeOnboarding,
+  getAuthStatus,
   getCurrentUser,
   getDashboard,
   getGoogleAuthorizationUrl,
@@ -12,7 +13,7 @@ import {
   recordClientAnalytics,
   registerUser,
 } from "../../lib/api-client";
-import type { DashboardResponse } from "../../lib/learner-types";
+import type { AuthStatus, DashboardResponse } from "../../lib/learner-types";
 
 type AuthMode = "login" | "register";
 
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(emptyDashboard);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [authForm, setAuthForm] = useState({
     name: "",
@@ -50,6 +52,10 @@ export default function DashboardPage() {
       try {
         setLoading(true);
         setError(null);
+
+        const status = await getAuthStatus();
+        setAuthStatus(status);
+
         const loadedDashboard = await loadDashboard();
         await recordClientAnalytics([
           {
@@ -61,8 +67,21 @@ export default function DashboardPage() {
             },
           },
         ]);
-      } catch {
+      } catch (caughtError) {
         setDashboard(null);
+
+        try {
+          const status = await getAuthStatus();
+          setAuthStatus(status);
+
+          if (!status.loginEnabled) {
+            setError(status.message);
+          } else if (caughtError instanceof Error) {
+            setError(caughtError.message);
+          }
+        } catch {
+          setError(caughtError instanceof Error ? caughtError.message : "The dashboard could not be loaded.");
+        }
       } finally {
         setLoading(false);
       }
@@ -73,8 +92,12 @@ export default function DashboardPage() {
 
   const isAuthenticated = Boolean(dashboard?.user);
   const needsOnboarding = Boolean(isAuthenticated && !dashboard?.user.onboardingCompleted);
+  const googleEnabled = Boolean(authStatus?.persistentAuthEnabled && authStatus?.googleConfigured);
 
-  const bestWeakArea = useMemo(() => dashboard?.weakAreas.find((area) => area.averageScore !== null) ?? null, [dashboard]);
+  const bestWeakArea = useMemo(
+    () => dashboard?.weakAreas.find((area) => area.averageScore !== null) ?? null,
+    [dashboard],
+  );
 
   async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,6 +105,10 @@ export default function DashboardPage() {
     setError(null);
 
     try {
+      if (!authStatus?.loginEnabled) {
+        throw new Error(authStatus?.message ?? "Authentication is not available on this deployment.");
+      }
+
       if (authMode === "register") {
         await registerUser({
           name: authForm.name,
@@ -124,6 +151,14 @@ export default function DashboardPage() {
     setError(null);
 
     try {
+      if (!googleEnabled) {
+        throw new Error(
+          authStatus?.persistentAuthEnabled
+            ? "Google sign-in is not configured on this deployment yet."
+            : authStatus?.message ?? "Google sign-in is unavailable right now.",
+        );
+      }
+
       const { authorizationUrl } = await getGoogleAuthorizationUrl();
       window.location.assign(authorizationUrl);
     } catch (caughtError) {
@@ -168,7 +203,7 @@ export default function DashboardPage() {
     return (
       <section className="panel section-space stack-md">
         <span className="pill">Learner app</span>
-        <h1 className="headline">Loading your English Talks dashboard…</h1>
+        <h1 className="headline">Loading your English Talks dashboard...</h1>
       </section>
     );
   }
@@ -187,6 +222,13 @@ export default function DashboardPage() {
           </div>
           <form className="panel section-space stack-sm" onSubmit={handleAuthSubmit}>
             <strong>{authMode === "register" ? "Create your learner account" : "Welcome back"}</strong>
+            {!authStatus?.loginEnabled ? (
+              <div className="panel route-card">
+                <p style={{ margin: 0, color: "var(--orange)" }}>
+                  {authStatus?.message ?? "Authentication is temporarily unavailable on this deployment."}
+                </p>
+              </div>
+            ) : null}
             {authMode === "register" ? (
               <label className="vocab-field">
                 <span>Full name</span>
@@ -216,17 +258,18 @@ export default function DashboardPage() {
               />
             </label>
             <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
-              <button className="button-primary" type="submit" disabled={submitting}>
-                {submitting ? "Please wait…" : authMode === "register" ? "Create account" : "Sign in"}
+              <button className="button-primary" type="submit" disabled={submitting || !authStatus?.loginEnabled}>
+                {submitting ? "Please wait..." : authMode === "register" ? "Create account" : "Sign in"}
               </button>
-              <button className="button-secondary" type="button" onClick={handleGoogleSignIn} disabled={submitting}>
-                Continue with Google
+              <button className="button-secondary" type="button" onClick={handleGoogleSignIn} disabled={submitting || !googleEnabled}>
+                {googleEnabled ? "Continue with Google" : "Google sign-in unavailable"}
               </button>
             </div>
             <button
               className="button-secondary"
               type="button"
               onClick={() => setAuthMode((current) => (current === "login" ? "register" : "login"))}
+              disabled={!authStatus?.registerEnabled}
             >
               {authMode === "login" ? "Need an account?" : "Already have an account?"}
             </button>
@@ -260,9 +303,7 @@ export default function DashboardPage() {
               <span>Current CEFR level</span>
               <select
                 value={onboardingForm.cefrLevel}
-                onChange={(event) =>
-                  setOnboardingForm((current) => ({ ...current, cefrLevel: event.target.value }))
-                }
+                onChange={(event) => setOnboardingForm((current) => ({ ...current, cefrLevel: event.target.value }))}
               >
                 {["A2", "B1", "B2", "C1"].map((level) => (
                   <option key={level} value={level}>
@@ -279,9 +320,7 @@ export default function DashboardPage() {
                 max={9}
                 step={0.5}
                 value={onboardingForm.targetBand}
-                onChange={(event) =>
-                  setOnboardingForm((current) => ({ ...current, targetBand: event.target.value }))
-                }
+                onChange={(event) => setOnboardingForm((current) => ({ ...current, targetBand: event.target.value }))}
               />
             </label>
           </div>
@@ -291,15 +330,13 @@ export default function DashboardPage() {
             <textarea
               rows={5}
               value={onboardingForm.studyReason}
-              onChange={(event) =>
-                setOnboardingForm((current) => ({ ...current, studyReason: event.target.value }))
-              }
+              onChange={(event) => setOnboardingForm((current) => ({ ...current, studyReason: event.target.value }))}
             />
           </label>
 
           <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
             <button className="button-primary" type="submit" disabled={submitting}>
-              {submitting ? "Saving…" : "Complete onboarding"}
+              {submitting ? "Saving..." : "Complete onboarding"}
             </button>
             <button className="button-secondary" type="button" onClick={handleLogout}>
               Sign out
@@ -350,10 +387,26 @@ export default function DashboardPage() {
 
       <section className="metric-grid">
         {[
-          { label: "Current CEFR", value: dashboard.user.cefrLevel ?? "B1", trend: dashboard.latestResult?.assessment?.estimatedBandLabel ?? "Keep practicing" },
-          { label: "Average IELTS band", value: dashboard.metrics.averageBand?.toFixed(1) ?? "—", trend: dashboard.bandTrend.length > 1 ? "Trend tracking active" : "Need more scored sessions" },
-          { label: "Free sessions left today", value: dashboard.metrics.freeTierRemaining.toString(), trend: dashboard.entitlement.isPremium ? "Unlimited on Premium" : "Upgrade for unlimited mocks" },
-          { label: "Streak + XP", value: `${dashboard.metrics.streakCount} / ${dashboard.metrics.xpPoints}`, trend: "Daily momentum" },
+          {
+            label: "Current CEFR",
+            value: dashboard.user.cefrLevel ?? "B1",
+            trend: dashboard.latestResult?.assessment?.estimatedBandLabel ?? "Keep practicing",
+          },
+          {
+            label: "Average IELTS band",
+            value: dashboard.metrics.averageBand?.toFixed(1) ?? "-",
+            trend: dashboard.bandTrend.length > 1 ? "Trend tracking active" : "Need more scored sessions",
+          },
+          {
+            label: "Free sessions left today",
+            value: dashboard.metrics.freeTierRemaining.toString(),
+            trend: dashboard.entitlement.isPremium ? "Unlimited on Premium" : "Upgrade for unlimited mocks",
+          },
+          {
+            label: "Streak + XP",
+            value: `${dashboard.metrics.streakCount} / ${dashboard.metrics.xpPoints}`,
+            trend: "Daily momentum",
+          },
         ].map((metric) => (
           <article key={metric.label} className="panel route-card stack-sm">
             <span className="muted">{metric.label}</span>
@@ -379,7 +432,7 @@ export default function DashboardPage() {
             <div className="panel route-card stack-sm">
               <strong>{bestWeakArea.label}</strong>
               <p className="muted" style={{ margin: 0 }}>
-                Average score: {bestWeakArea.averageScore?.toFixed(1) ?? "—"}. Prioritize this area
+                Average score: {bestWeakArea.averageScore?.toFixed(1) ?? "-"}. Prioritize this area
                 in your next IELTS speaking response.
               </p>
             </div>

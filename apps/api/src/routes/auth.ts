@@ -95,6 +95,23 @@ async function exchangeGoogleCodeForUser(code: string) {
 
 export const authRouter = Router();
 
+authRouter.get("/status", (_req, res) => {
+  const persistentAuthEnabled = assertPersistentDatabase();
+  const googleConfigured = Boolean(
+    config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET && config.GOOGLE_REDIRECT_URI,
+  );
+
+  return res.json({
+    persistentAuthEnabled,
+    googleConfigured,
+    loginEnabled: persistentAuthEnabled,
+    registerEnabled: persistentAuthEnabled,
+    message: persistentAuthEnabled
+      ? "Authentication is available."
+      : "Authentication is disabled on this deployment until a persistent production database is configured.",
+  });
+});
+
 authRouter.post("/register", async (req: AuthenticatedRequest, res) => {
   if (!assertPersistentDatabase()) {
     return res.status(503).json({ error: "Registration requires a persistent database. Configure Turso to enable auth." });

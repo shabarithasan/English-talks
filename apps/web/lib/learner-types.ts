@@ -35,6 +35,10 @@ export type SessionAssessment = {
   weaknesses: string[];
   nextSteps: string[];
   estimatedBandLabel: string | null;
+  provider: string | null;
+  inferenceLatencyMs: number | null;
+  helpfulnessRating: number | null;
+  helpfulnessComment: string | null;
   createdAt: string;
 };
 
@@ -64,6 +68,8 @@ export type LearnerSession = {
     fullText: string;
     languageCode: string;
     confidence: number | null;
+    provider: string | null;
+    transcriptionLatencyMs: number | null;
     segments: Array<{
       id: string;
       startMs: number;
@@ -123,4 +129,12 @@ export type BillingPlan = {
   interval: string;
   priceLabel: string;
   features: string[];
+};
+
+export type AuthStatus = {
+  persistentAuthEnabled: boolean;
+  googleConfigured: boolean;
+  loginEnabled: boolean;
+  registerEnabled: boolean;
+  message: string;
 };
