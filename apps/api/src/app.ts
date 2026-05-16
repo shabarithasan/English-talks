@@ -35,6 +35,7 @@ export function createApp() {
     res.json({
       status: "ok",
       service: "english-talks-api",
+      version: "git-deploy-1",
       databaseMode: databaseEnabled ? "persistent" : "stateless-demo",
       timestamp: new Date().toISOString(),
     });
